@@ -2,5 +2,6 @@
 ## Title: Classic EPGP - Class Specific GP
 ## Author: Earnil
 ## Dependencies: CEPGP
+## SavedVariables: GP_CLASS_TABLE, CEPGPCSGP_Player_Class
 
 Core.lua
