@@ -15,6 +15,8 @@ end
 
 local origCEPGP_ListButton_OnClick = CEPGP_ListButton_OnClick
 local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
+local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
+local origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 --GP_CLASS_TABLE,CEPGPCSGP_Player_Class
 
 --/run CEPGP_distribute_popup:Show()
@@ -136,6 +138,7 @@ local function refreshDropdown(player, itemID)
                 CEPGP_distribute_GP_value:SetText(itemGP)
                 CEPGP_distribute_popup_gp_full:SetText(itemGP)    
                 CEPGPCSGP_Player_Class[player] = b.value
+                CEPCSGP_UpdateLootScrollBar(true)
             end
             UIDropDownMenu_AddButton(info)
         end
@@ -149,7 +152,14 @@ function CEPCSGP_Init()
 	if (_G.CEPGP) then
 		_G.CEPGP_ListButton_OnClick = CEPGP_ListButton_OnClick_Hook
         _G.CEPGP_sendChatMessage = CEPCSGP_sendChatMessage
+        _G.CEPGP_UpdateLootScrollBar = CEPCSGP_UpdateLootScrollBar
+        _G.CEPGP_addAddonMsg = CEPCSGP_addAddonMsg
 	end
+    --CEPGP_frame:SetWidth(800)
+    _G["CEPGP_distribute_raid_prio"] = CEPGP_distribute_item_tex:CreateFontString("CEPGP_distribute_raid_prio", "OVERLAY", "GameFontNormal")
+    _G["CEPGP_distribute_raid_prio"]:SetPoint("LEFT",CEPGP_distribute_item_tex, "LEFT",  635, -34)   
+    _G["CEPGP_distribute_raid_prio"]:SetText("Prio")
+
     CEPGP_distribute_popup:SetHeight(130)
     if not CEPGPCSGP_Player_Class then
         CEPGPCSGP_Player_Class = {}
@@ -171,34 +181,132 @@ function CEPGP_ListButton_OnClick_Hook(obj, button)
 	origCEPGP_ListButton_OnClick(obj, button)
 end
 
+function CEPCSGP_addAddonMsg(message, channel, player)
+    local args = CEPGP_split(message, ";")
+
+    if args[1] == "CallItem"  and GP_CLASS_TABLE[tonumber(args[2])] then
+        local itemID = tonumber(args[2])
+        local messageEnd = ""
+
+        for i = 4, #args do
+            messageEnd = messageEnd .. ";" .. args[i]
+        end  
+        
+        for index = 1, GetNumGroupMembers() do
+            local name = GetRaidRosterInfo(index);
+            local playerGP
+
+            if CEPGPCSGP_Player_Class[name] and GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]] then
+                playerGP = GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]]['GP']
+            else 
+                playerGP = 9999
+            end
+            print("  ", name .. ", " .. channel .. ", " , player)
+            print("   MSG Orig:",   message)
+            message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
+            print("   MSG New:",   message)
+
+            origCEPGP_addAddonMsg(message, "WHISPER", name);
+
+            if name == UnitName("player") then
+                _G["CEPGP_respond_gp_value"]:SetText(playerGP)
+                if CEPGP_Info.Guild.Roster[name] then
+                    local gindex = CEPGP_getIndex(name);
+                    local EP, GP = CEPGP_getEPGP(name, gindex);
+                    local actualPR = math.floor((EP/GP)*100)/100
+                    local potentialPR = math.floor((EP/(GP+playerGP))*100)/100
+                    prChangeText = "PR: " .. actualPR .. " -> " .. potentialPR;
+                end
+                _G["CEPGP_respond_gp_change"]:SetText(prChangeText)
+            end
+        end        
+        
+        C_Timer.After(0.5, function()            
+            _G["CEPGP_distribute_GP_value"]:Hide()
+            _G["CEPGP_distribute_GP_head"]:Hide()
+        end)
+    else
+        origCEPGP_addAddonMsg(message, channel, player)
+    end
+end
 
 function CEPCSGP_sendChatMessage(msg, channel)
 	if not msg then return; end
-    print(msg)
     if string.match(msg, ".+ %(%w+%) needs %(.+%)%. %(.+ PR%) %(Rolled %d+%)") then
 
         local name = string.match(msg, "(.+) %(%w+%) needs")
         local reason = string.match(msg, ".+ %(%w+%) needs %((.+)%)%. %(.+ PR%) %(Rolled %d+%)")
         local PR = string.match(msg, ".+ %(%w+%) needs %(.+%)%. %((.+) PR%) %(Rolled %d+%)")
         local roll = string.match(msg, ".+ %(%w+%) needs %(.+%)%. %(.+ PR%) %(Rolled (%d+)%)")
-        print(name, reason, PR, roll)
 
         if CEPGPCSGP_Player_Class[name] then            
             local itemID = tonumber(CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText()))
-            local class = CEPGPCSGP_Player_Class[name]     
-            local gp = GP_CLASS_TABLE[itemID][class]['GP']
-            local prio = GP_CLASS_TABLE[itemID][class]['Prio']
-            if prio ~= "" then prio = ", Prio: " .. prio end
+            local class = CEPGPCSGP_Player_Class[name]  
+            if GP_CLASS_TABLE[itemID] and GP_CLASS_TABLE[itemID][class]and GP_CLASS_TABLE[itemID][class]['GP'] and GP_CLASS_TABLE[itemID][class]['Prio'] then
+                local gp = GP_CLASS_TABLE[itemID][class]['GP']
+                local prio = GP_CLASS_TABLE[itemID][class]['Prio']
+                if prio ~= "" then prio = ", Prio: " .. prio end
 
-            SendChatMessage(name .. " <" .. CEPGPCSGP_Player_Class[name] .. " " .. gp .. "GP> (" .. reason .. ", PR: " .. PR .. prio .. ", R: " .. roll .. ")", CEPGP.LootChannel)
+                SendChatMessage(name .. " <" .. CEPGPCSGP_Player_Class[name] .. " " .. gp .. "GP> (" .. reason .. ", PR: " .. PR .. prio .. ", R: " .. roll .. ")", CEPGP.LootChannel)
+            else 
+                origCEPGP_sendChatMessage(msg, channel)
+            end
         else
-            SendChatMessage(name .. " <" .. "No Class Set" .. " " .. gp .. "GP> (" .. reason .. ", PR: " .. PR .. ", Prio: " .. prio .. ", R: " .. roll .. ")", CEPGP.LootChannel)
+            SendChatMessage(name .. " <" .. "no class set" .."> (" .. reason .. ", PR: " .. PR .. ", Prio: unknown, R: " .. roll .. ")", CEPGP.LootChannel)
         end
     else
         origCEPGP_sendChatMessage(msg, channel)
     end
 end
 
+function CEPCSGP_UpdateLootScrollBar(PRsort, sort)
+    origCEPGP_UpdateLootScrollBar(PRsort, sort)
+    local index = 1
+
+    while(true) do
+        
+        if not _G["LootDistButton" .. index] then break end
+
+        local name =  _G["LootDistButton" .. index .. "Info"]:GetText()
+        local prio = "no class set"
+        if CEPGPCSGP_Player_Class[name] then   
+            local itemID = tonumber(CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText()))
+            local class = CEPGPCSGP_Player_Class[name]
+            if GP_CLASS_TABLE[itemID] and GP_CLASS_TABLE[itemID][class] and GP_CLASS_TABLE[itemID][class]['Prio'] then
+                prio = GP_CLASS_TABLE[itemID][class]['Prio']
+            else
+                prio = ""
+            end
+        end
+        if not _G["LootDistButton" .. index .. "Prio"] then
+            _G["LootDistButton" .. index .. "PrioFontstring"] = _G["LootDistButton" .. index]:CreateFontString("LootDistButton" .. index .. "PrioFontstring", "OVERLAY", "GameFontHighlightSmall")
+            _G["LootDistButton" .. index .. "PrioFontstring"]:SetPoint("LEFT",_G["LootDistButton" .. index], "LEFT",  650, 0) 
+            
+            _G["LootDistButton" .. index .. "Prio"] = CreateFrame("Button", "LootDistButton" .. index .. "Prio", _G["LootDistButton" .. index], nil)
+            _G["LootDistButton" .. index .. "Prio"]:SetWidth(60)
+            _G["LootDistButton" .. index .. "Prio"]:SetHeight(15)
+            _G["LootDistButton" .. index .. "Prio"]:SetPoint("LEFT", _G["LootDistButton" .. index], "LEFT", 650, 0)
+            _G["LootDistButton" .. index .. "Prio"]:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+            _G["LootDistButton" .. index .. "Prio"]:SetBackdropColor(0 ,0 ,0 ,0)
+            _G["LootDistButton" .. index .. "Prio"]:RegisterForDrag("LeftButton")
+            _G["LootDistButton" .. index .. "Prio"]:SetFrameStrata("MEDIUM") 
+            _G["LootDistButton" .. index .. "Prio"]:SetFrameLevel(7)         
+            _G["LootDistButton" .. index .. "Prio"]:SetScript('OnLeave', function(self, motion)  
+                GameTooltip:Hide()
+            end)
+        end
+        _G["LootDistButton" .. index .. "PrioFontstring"]:SetText(prio)
+                 
+        _G["LootDistButton" .. index .. "Prio"]:SetScript('OnEnter', function(self, motion)  
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(prio)--_G["LootDistButton" .. index .. "Prio"]:GetText())--getglobal(self:GetName().."Text"):GetText())
+            GameTooltip:Show()
+        end)    
+
+        index = index + 1
+    end
+
+end
 
 function CEPCSGP_StaticPopupImport()    
     StaticPopupDialogs["CEPCSGP_IMPORT"] =
