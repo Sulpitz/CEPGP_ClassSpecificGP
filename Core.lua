@@ -1,18 +1,3 @@
-SLASH_CEPGPCSGP1 = "/cepcpcsgp"
-SLASH_CEPGPCSGP2 = "/cepcsgp"
-function SlashCmdList.CEPGPCSGP(msg, editbox) 
-    if msg == "" then
-        CEPCSGP_StaticPopupImport()
-    elseif msg == "t" then 
-        CEPGP_distribute_popup:Show()
-        refreshDropdown()
-    elseif msg == "test" then
-        print("test")
-        CEPCSGP_Test()
-    end
-end
-
-
 local origCEPGP_ListButton_OnClick = CEPGP_ListButton_OnClick
 local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
 local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
@@ -21,22 +6,19 @@ local origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 
 --/run CEPGP_distribute_popup:Show()
 
-
-
-
---CEPGP_distribute_popup:Show()
-
---CEPGPCSGP_FontString = CEPGP_distribute_popup:CreateFontString(_, "MEDIUM", "GameFontNormalSmall")
---CEPGPCSGP_FontString:SetText("text!!!!!!!!!!!!!!!!!!!!!")    
---CEPGPCSGP_FontString:SetPoint('LEFT', CEPGP_distribute_popup, 'TOPLEFT', 15, -40)
---CEPGPCSGP_FontString:SetTextHeight(10)
-
---- Opts:
----     name (string): Name of the dropdown (lowercase)
----     parent (Frame): Parent frame of the dropdown.
----     items (Table): String table of the dropdown options.
----     defaultVal (String): String value for the dropdown to default to (empty otherwise).
----     changeFunc (Function): A custom function to be called, after selecting a dropdown option.
+SLASH_CEPGPCSGP1 = "/cepcpcsgp"
+SLASH_CEPGPCSGP2 = "/cepcsgp"
+function SlashCmdList.CEPGPCSGP(msg, editbox) 
+    if msg == "" then
+        CEPCSGP_StaticPopupImport()
+    elseif msg == "send" then 
+        CEPCSGP_SendAll()
+        CEPGP_print("Sending all Player Spec Data")
+    elseif msg == "clear" then
+        CEPGPCSGP_Player_Class = {}
+        CEPGP_print("CEPCSGP Player Spec Table cleared")
+    end
+end
 
 
 
@@ -77,7 +59,8 @@ local function refreshDropdown(player, itemID)
         defaultVal = CEPGPCSGP_Player_Class[player]
         local itemGP = GP_CLASS_TABLE[itemID][defaultVal]['GP']
         CEPGP_distribute_GP_value:SetText(itemGP)
-        CEPGP_distribute_popup_gp_full:SetText(itemGP)  
+        CEPGP_distribute_popup_gp_full:SetText(itemGP)          
+        origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPGPCSGP_Player_Class[player], "GUILD")
     else 
         defaultVal = ''
     end
@@ -138,6 +121,7 @@ local function refreshDropdown(player, itemID)
                 CEPGP_distribute_GP_value:SetText(itemGP)
                 CEPGP_distribute_popup_gp_full:SetText(itemGP)    
                 CEPGPCSGP_Player_Class[player] = b.value
+                origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPGPCSGP_Player_Class[player], "GUILD")
                 CEPCSGP_UpdateLootScrollBar(true)
             end
             UIDropDownMenu_AddButton(info)
@@ -160,6 +144,11 @@ function CEPCSGP_Init()
     _G["CEPGP_distribute_raid_prio"]:SetPoint("LEFT",CEPGP_distribute_item_tex, "LEFT",  635, -34)   
     _G["CEPGP_distribute_raid_prio"]:SetText("Prio")
 
+    local CEPCSGP_EventFrame = CreateFrame("Frame")
+    CEPCSGP_EventFrame:RegisterEvent('CHAT_MSG_ADDON')
+    CEPCSGP_EventFrame:SetScript("OnEvent", CEPCSGP_EventHandler)
+    --C_ChatInfo.RegisterAddonMessagePrefix(CEPCSGP_prefix)    
+
     CEPGP_distribute_popup:SetHeight(130)
     if not CEPGPCSGP_Player_Class then
         CEPGPCSGP_Player_Class = {}
@@ -167,13 +156,33 @@ function CEPCSGP_Init()
     createDropdown()
 end
 
+function CEPCSGP_SendAll()
+    for name, spec in pairs(CEPGPCSGP_Player_Class) do        
+        origCEPGP_addAddonMsg("SetSpec;" .. name .. ";" .. spec, "GUILD")
+    end
+end
 
+function CEPCSGP_EventHandler(self, event, ...)
+    local prefix, message, cannel, _, sender = ...
+
+    --if sender == UnitName("player") then do return end end
+
+    if event == "CHAT_MSG_ADDON" and prefix == "CEPGP" then 
+        local args = CEPGP_split(message, ";");
+        if args[1] == "SetSpec" then
+            CEPGPCSGP_Player_Class[args[2]] = args[3]
+            CEPGP_print("SetSpec: [" .. args[2] .. "] = " .. args[3])
+        end
+    end
+
+end
 
 -- [[ CEPGP Hook ]] --
 function CEPGP_ListButton_OnClick_Hook(obj, button)
 	if CEPGP_DFB_Distributing and button == "LeftButton" then
         if strfind(obj, "LootDistButton") then
             local player = _G[_G[obj]:GetName() .. "Info"]:GetText()
+            print("Click", player)
             local itemID = CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText())
             refreshDropdown(player, itemID)
         end
@@ -194,30 +203,32 @@ function CEPCSGP_addAddonMsg(message, channel, player)
         
         for index = 1, GetNumGroupMembers() do
             local name = GetRaidRosterInfo(index);
-            local playerGP
+            if UnitIsConnected("raid" .. index) then
+                local playerGP
 
-            if CEPGPCSGP_Player_Class[name] and GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]] then
-                playerGP = GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]]['GP']
-            else 
-                playerGP = 9999
-            end
-            print("  ", name .. ", " .. channel .. ", " , player)
-            print("   MSG Orig:",   message)
-            message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
-            print("   MSG New:",   message)
-
-            origCEPGP_addAddonMsg(message, "WHISPER", name);
-
-            if name == UnitName("player") then
-                _G["CEPGP_respond_gp_value"]:SetText(playerGP)
-                if CEPGP_Info.Guild.Roster[name] then
-                    local gindex = CEPGP_getIndex(name);
-                    local EP, GP = CEPGP_getEPGP(name, gindex);
-                    local actualPR = math.floor((EP/GP)*100)/100
-                    local potentialPR = math.floor((EP/(GP+playerGP))*100)/100
-                    prChangeText = "PR: " .. actualPR .. " -> " .. potentialPR;
+                if CEPGPCSGP_Player_Class[name] and GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]] then
+                    playerGP = GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]]['GP']
+                else 
+                    playerGP = 9999
                 end
-                _G["CEPGP_respond_gp_change"]:SetText(prChangeText)
+                --print("  ", name .. ", " .. channel .. ", " , player)
+                --print("   MSG Orig:",   message)
+                message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
+                --print("   MSG New:",   message)
+
+                origCEPGP_addAddonMsg(message, "WHISPER", name);
+
+                if name == UnitName("player") then
+                    _G["CEPGP_respond_gp_value"]:SetText(playerGP)
+                    if CEPGP_Info.Guild.Roster[name] then
+                        local gindex = CEPGP_getIndex(name);
+                        local EP, GP = CEPGP_getEPGP(name, gindex);
+                        local actualPR = math.floor((EP/GP)*100)/100
+                        local potentialPR = math.floor((EP/(GP+playerGP))*100)/100
+                        prChangeText = "PR: " .. actualPR .. " -> " .. potentialPR;
+                    end
+                    _G["CEPGP_respond_gp_change"]:SetText(prChangeText)
+                end
             end
         end        
         
