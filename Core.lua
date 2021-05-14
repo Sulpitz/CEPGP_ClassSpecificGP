@@ -146,6 +146,7 @@ function CEPCSGP_Init()
 
     local CEPCSGP_EventFrame = CreateFrame("Frame")
     CEPCSGP_EventFrame:RegisterEvent('CHAT_MSG_ADDON')
+    CEPCSGP_EventFrame:RegisterEvent('CHAT_MSG_WHISPER')
     CEPCSGP_EventFrame:SetScript("OnEvent", CEPCSGP_EventHandler)
     --C_ChatInfo.RegisterAddonMessagePrefix(CEPCSGP_prefix)    
 
@@ -156,25 +157,35 @@ function CEPCSGP_Init()
     createDropdown()
 end
 
-function CEPCSGP_SendAll()
-    for name, spec in pairs(CEPGPCSGP_Player_Class) do        
-        origCEPGP_addAddonMsg("SetSpec;" .. name .. ";" .. spec, "GUILD")
-    end
-end
-
 function CEPCSGP_EventHandler(self, event, ...)
     local prefix, message, cannel, _, sender = ...
+    local arg1 = prefix
 
     --if sender == UnitName("player") then do return end end
-
     if event == "CHAT_MSG_ADDON" and prefix == "CEPGP" then 
         local args = CEPGP_split(message, ";");
         if args[1] == "SetSpec" then
             CEPGPCSGP_Player_Class[args[2]] = args[3]
             CEPGP_print("SetSpec: [" .. args[2] .. "] = " .. args[3])
         end
+    elseif event == "CHAT_MSG_WHISPER" and CEPGP_Info.Loot.Distributing and CEPGP_Info.Loot.ItemsTable[sender] then
+        if string.lower(arg1) == "pass" or string.lower(arg1) == "passe" then
+            CEPGP_handleComms("CHAT_MSG_WHISPER", nil, sender, 6, CEPGP_Info.Loot.GUID)
+            return;
+        end
+        for i = 1, 4 do
+            if string.lower(arg1) == string.lower(CEPGP.Loot.GUI.Buttons[i][4]) then         
+                CEPGP_handleComms("CHAT_MSG_WHISPER", nil, sender, i, CEPGP_Info.Loot.GUID)
+                return;
+            end
+        end
     end
+end
 
+function CEPCSGP_SendAll()
+    for name, spec in pairs(CEPGPCSGP_Player_Class) do        
+        origCEPGP_addAddonMsg("SetSpec;" .. name .. ";" .. spec, "GUILD")
+    end
 end
 
 -- [[ CEPGP Hook ]] --
@@ -182,7 +193,6 @@ function CEPGP_ListButton_OnClick_Hook(obj, button)
 	if CEPGP_DFB_Distributing and button == "LeftButton" then
         if strfind(obj, "LootDistButton") then
             local player = _G[_G[obj]:GetName() .. "Info"]:GetText()
-            print("Click", player)
             local itemID = CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText())
             refreshDropdown(player, itemID)
         end
