@@ -2,7 +2,8 @@ local origCEPGP_ListButton_OnClick = CEPGP_ListButton_OnClick
 local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
 local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
 local origCEPGP_addAddonMsg = CEPGP_addAddonMsg
---GP_CLASS_TABLE,CEPGPCSGP_Player_Class
+local origCEPGP_populateFrame = CEPGP_populateFrame
+--CEPCSGP_ITEM_TABLE,CEPCSGP_PLAYER_CLASS_TABLE
 
 --/run CEPGP_distribute_popup:Show()
 
@@ -14,9 +15,12 @@ function SlashCmdList.CEPGPCSGP(msg, editbox)
     elseif msg == "send" then 
         CEPCSGP_SendAll()
         CEPGP_print("Sending all Player Spec Data")
-    elseif msg == "clear" then
-        CEPGPCSGP_Player_Class = {}
+    elseif msg == "clear class" then
+        CEPCSGP_PLAYER_CLASS_TABLE = {}
         CEPGP_print("CEPCSGP Player Spec Table cleared")
+    elseif msg == "clear item" then
+        CEPCSGP_ITEM_TABLE = {}
+        CEPGP_print("CEPCSGP Items cleared")
     end
 end
 
@@ -40,7 +44,7 @@ end
 
 local function refreshDropdown(player, itemID)
     itemID = tonumber(itemID)
-    if GP_CLASS_TABLE[itemID] == nil then
+    if CEPCSGP_ITEM_TABLE[itemID] == nil then
         CEPGP_print("Item ID " .. itemID .. " not in Table")
         if CEPCSGP_ClassCP_Dropdown then
             CEPCSGP_ClassCP_Dropdown:Hide()
@@ -50,17 +54,17 @@ local function refreshDropdown(player, itemID)
     CEPCSGP_ClassCP_Dropdown:Show()
     local classTable = {}
 
-    for class, _ in pairs(GP_CLASS_TABLE[itemID]) do
+    for class, _ in pairs(CEPCSGP_ITEM_TABLE[itemID]) do
         table.insert(classTable,class)
     end
 
     local defaultVal
-    if CEPGPCSGP_Player_Class[player] then
-        defaultVal = CEPGPCSGP_Player_Class[player]
-        local itemGP = GP_CLASS_TABLE[itemID][defaultVal]['GP']
+    if CEPCSGP_PLAYER_CLASS_TABLE[player] then
+        defaultVal = CEPCSGP_PLAYER_CLASS_TABLE[player]
+        local itemGP = CEPCSGP_ITEM_TABLE[itemID][defaultVal]['GP']
         CEPGP_distribute_GP_value:SetText(itemGP)
         CEPGP_distribute_popup_gp_full:SetText(itemGP)          
-        origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPGPCSGP_Player_Class[player], "GUILD")
+        origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPCSGP_PLAYER_CLASS_TABLE[player], "GUILD")
     else 
         defaultVal = ''
     end
@@ -117,11 +121,11 @@ local function refreshDropdown(player, itemID)
                 UIDropDownMenu_SetSelectedValue(CEPCSGP_ClassCP_Dropdown, b.value, b.value)
                 UIDropDownMenu_SetText(CEPCSGP_ClassCP_Dropdown, b.value)
                 b.checked = true
-                local itemGP = GP_CLASS_TABLE[itemID][b.value]['GP']
+                local itemGP = CEPCSGP_ITEM_TABLE[itemID][b.value]['GP']
                 CEPGP_distribute_GP_value:SetText(itemGP)
                 CEPGP_distribute_popup_gp_full:SetText(itemGP)    
-                CEPGPCSGP_Player_Class[player] = b.value
-                origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPGPCSGP_Player_Class[player], "GUILD")
+                CEPCSGP_PLAYER_CLASS_TABLE[player] = b.value
+                origCEPGP_addAddonMsg("SetSpec;" .. player .. ";" .. CEPCSGP_PLAYER_CLASS_TABLE[player], "GUILD")
                 CEPCSGP_UpdateLootScrollBar(true)
             end
             UIDropDownMenu_AddButton(info)
@@ -138,6 +142,7 @@ function CEPCSGP_Init()
         _G.CEPGP_sendChatMessage = CEPCSGP_sendChatMessage
         _G.CEPGP_UpdateLootScrollBar = CEPCSGP_UpdateLootScrollBar
         _G.CEPGP_addAddonMsg = CEPCSGP_addAddonMsg
+        _G.CEPGP_populateFrame = CEPCSGP_populateFrame
 	end
     --CEPGP_frame:SetWidth(800)
     _G["CEPGP_distribute_raid_prio"] = CEPGP_distribute_item_tex:CreateFontString("CEPGP_distribute_raid_prio", "OVERLAY", "GameFontNormal")
@@ -151,8 +156,8 @@ function CEPCSGP_Init()
     --C_ChatInfo.RegisterAddonMessagePrefix(CEPCSGP_prefix)    
 
     CEPGP_distribute_popup:SetHeight(130)
-    if not CEPGPCSGP_Player_Class then
-        CEPGPCSGP_Player_Class = {}
+    if not CEPCSGP_PLAYER_CLASS_TABLE then
+        CEPCSGP_PLAYER_CLASS_TABLE = {}
     end
     createDropdown()
 end
@@ -165,7 +170,7 @@ function CEPCSGP_EventHandler(self, event, ...)
     if event == "CHAT_MSG_ADDON" and prefix == "CEPGP" then 
         local args = CEPGP_split(message, ";");
         if args[1] == "SetSpec" then
-            CEPGPCSGP_Player_Class[args[2]] = args[3]
+            CEPCSGP_PLAYER_CLASS_TABLE[args[2]] = args[3]
             CEPGP_print("SetSpec: [" .. args[2] .. "] = " .. args[3])
         end
     elseif event == "CHAT_MSG_WHISPER" and CEPGP_Info.Loot.Distributing and CEPGP_Info.Loot.ItemsTable[sender] then
@@ -183,14 +188,16 @@ function CEPCSGP_EventHandler(self, event, ...)
 end
 
 function CEPCSGP_SendAll()
-    for name, spec in pairs(CEPGPCSGP_Player_Class) do        
+    for name, spec in pairs(CEPCSGP_PLAYER_CLASS_TABLE) do        
         origCEPGP_addAddonMsg("SetSpec;" .. name .. ";" .. spec, "GUILD")
     end
 end
 
 -- [[ CEPGP Hook ]] --
 function CEPGP_ListButton_OnClick_Hook(obj, button)
-	if CEPGP_DFB_Distributing and button == "LeftButton" then
+    
+	if button == "LeftButton" then
+        
         if strfind(obj, "LootDistButton") then
             local player = _G[_G[obj]:GetName() .. "Info"]:GetText()
             local itemID = CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText())
@@ -203,7 +210,7 @@ end
 function CEPCSGP_addAddonMsg(message, channel, player)
     local args = CEPGP_split(message, ";")
 
-    if args[1] == "CallItem"  and GP_CLASS_TABLE[tonumber(args[2])] then
+    if args[1] == "CallItem"  and CEPCSGP_ITEM_TABLE[tonumber(args[2])] then
         local itemID = tonumber(args[2])
         local messageEnd = ""
 
@@ -216,8 +223,8 @@ function CEPCSGP_addAddonMsg(message, channel, player)
             if UnitIsConnected("raid" .. index) then
                 local playerGP
 
-                if CEPGPCSGP_Player_Class[name] and GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]] then
-                    playerGP = GP_CLASS_TABLE[itemID][CEPGPCSGP_Player_Class[name]]['GP']
+                if CEPCSGP_PLAYER_CLASS_TABLE[name] and CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]] then
+                    playerGP = CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]]['GP']
                 else 
                     playerGP = 9999
                 end
@@ -260,15 +267,15 @@ function CEPCSGP_sendChatMessage(msg, channel)
         local PR = string.match(msg, ".+ %(%w+%) needs %(.+%)%. %((.+) PR%) %(Rolled %d+%)")
         local roll = string.match(msg, ".+ %(%w+%) needs %(.+%)%. %(.+ PR%) %(Rolled (%d+)%)")
 
-        if CEPGPCSGP_Player_Class[name] then            
+        if CEPCSGP_PLAYER_CLASS_TABLE[name] then            
             local itemID = tonumber(CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText()))
-            local class = CEPGPCSGP_Player_Class[name]  
-            if GP_CLASS_TABLE[itemID] and GP_CLASS_TABLE[itemID][class]and GP_CLASS_TABLE[itemID][class]['GP'] and GP_CLASS_TABLE[itemID][class]['Prio'] then
-                local gp = GP_CLASS_TABLE[itemID][class]['GP']
-                local prio = GP_CLASS_TABLE[itemID][class]['Prio']
+            local class = CEPCSGP_PLAYER_CLASS_TABLE[name]  
+            if CEPCSGP_ITEM_TABLE[itemID] and CEPCSGP_ITEM_TABLE[itemID][class]and CEPCSGP_ITEM_TABLE[itemID][class]['GP'] and CEPCSGP_ITEM_TABLE[itemID][class]['Prio'] then
+                local gp = CEPCSGP_ITEM_TABLE[itemID][class]['GP']
+                local prio = CEPCSGP_ITEM_TABLE[itemID][class]['Prio']
                 if prio ~= "" then prio = ", Prio: " .. prio end
 
-                SendChatMessage(name .. " <" .. CEPGPCSGP_Player_Class[name] .. " " .. gp .. "GP> (" .. reason .. ", PR: " .. PR .. prio .. ", R: " .. roll .. ")", CEPGP.LootChannel)
+                SendChatMessage(name .. " <" .. CEPCSGP_PLAYER_CLASS_TABLE[name] .. " " .. gp .. "GP> (" .. reason .. ", PR: " .. PR .. prio .. ", R: " .. roll .. ")", CEPGP.LootChannel)
             else 
                 origCEPGP_sendChatMessage(msg, channel)
             end
@@ -290,11 +297,11 @@ function CEPCSGP_UpdateLootScrollBar(PRsort, sort)
 
         local name =  _G["LootDistButton" .. index .. "Info"]:GetText()
         local prio = "no class set"
-        if CEPGPCSGP_Player_Class[name] then   
+        if CEPCSGP_PLAYER_CLASS_TABLE[name] then   
             local itemID = tonumber(CEPGP_getItemID(_G["CEPGP_distribute_item_name"]:GetText()))
-            local class = CEPGPCSGP_Player_Class[name]
-            if GP_CLASS_TABLE[itemID] and GP_CLASS_TABLE[itemID][class] and GP_CLASS_TABLE[itemID][class]['Prio'] then
-                prio = GP_CLASS_TABLE[itemID][class]['Prio']
+            local class = CEPCSGP_PLAYER_CLASS_TABLE[name]
+            if CEPCSGP_ITEM_TABLE[itemID] and CEPCSGP_ITEM_TABLE[itemID][class] and CEPCSGP_ITEM_TABLE[itemID][class]['Prio'] then
+                prio = CEPCSGP_ITEM_TABLE[itemID][class]['Prio']
             else
                 prio = ""
             end
@@ -307,8 +314,8 @@ function CEPCSGP_UpdateLootScrollBar(PRsort, sort)
             _G["LootDistButton" .. index .. "Prio"]:SetWidth(60)
             _G["LootDistButton" .. index .. "Prio"]:SetHeight(15)
             _G["LootDistButton" .. index .. "Prio"]:SetPoint("LEFT", _G["LootDistButton" .. index], "LEFT", 650, 0)
-            _G["LootDistButton" .. index .. "Prio"]:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
-            _G["LootDistButton" .. index .. "Prio"]:SetBackdropColor(0 ,0 ,0 ,0)
+            --_G["LootDistButton" .. index .. "Prio"]:SetBackdrop({bgFile = "Interface\\Tooltips\\UI-Tooltip-Background"})
+            --_G["LootDistButton" .. index .. "Prio"]:SetBackdropColor(0 ,0 ,0 ,0)
             _G["LootDistButton" .. index .. "Prio"]:RegisterForDrag("LeftButton")
             _G["LootDistButton" .. index .. "Prio"]:SetFrameStrata("MEDIUM") 
             _G["LootDistButton" .. index .. "Prio"]:SetFrameLevel(7)         
@@ -326,7 +333,18 @@ function CEPCSGP_UpdateLootScrollBar(PRsort, sort)
 
         index = index + 1
     end
+end
 
+function CEPCSGP_populateFrame(items)
+    origCEPGP_populateFrame(items)
+    i = 1
+    for _, _ in pairs(items) do
+        if _G[CEPGP_Info.Mode..'item'..i] then
+            _G[CEPGP_Info.Mode..'itemGP'..i]:SetText("-1")
+        end
+        i = i + 1
+    end
+    print("origCEPGP_populateFrame")
 end
 
 function CEPCSGP_StaticPopupImport()    
@@ -359,7 +377,7 @@ function CEPCSGP_StaticPopupImport()
 
                 local editbox = _G[this:GetParent():GetName() .. "WideEditBox"] or _G[this:GetName() .. "EditBox"]
 
-                local importstring = "GP_CLASS_TABLE = {" .. editbox:GetText() .. "}"
+                local importstring = "CEPCSGP_ITEM_TABLE = {" .. editbox:GetText() .. "}"
 
                 local _, err = loadstring(importstring)
 
@@ -371,12 +389,16 @@ function CEPCSGP_StaticPopupImport()
                     local i = 0         
 
                     local p = 0
-                    for k, v in pairs(GP_CLASS_TABLE) do
+                    for itemID, data in pairs(CEPCSGP_ITEM_TABLE) do
+                        print("   " .. itemID)
+                        for class, data1 in pairs(data) do
+                            print("      " .. class)
+                        end
                         p = p + 1
                     end
-                    print("length GP_CLASS_TABLE:", p)
+                    print("length CEPCSGP_ITEM_TABLE:", p)
 
-                    for id, _ in pairs (GP_CLASS_TABLE) do
+                    for id, _ in pairs (CEPCSGP_ITEM_TABLE) do
                         i = i + 1
                         idTable[i] = id
                     end
@@ -410,6 +432,9 @@ function CEPCSGP_StaticPopupImport()
                     --    end
                     --end)                
                     --CEPGP_override:Show()
+                else
+                    message("Import Error")
+                    print("error: " .. err)                    
                 end
             end,
             OnCancel = NOP,
