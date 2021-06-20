@@ -337,14 +337,15 @@ end
 
 function CEPCSGP_populateFrame(items)
     origCEPGP_populateFrame(items)
-    i = 1
-    for _, _ in pairs(items) do
-        if _G[CEPGP_Info.Mode..'item'..i] then
-            _G[CEPGP_Info.Mode..'itemGP'..i]:SetText("-1")
+    if items and type(items) == table then
+        i = 1
+        for _, _ in pairs(items) do
+            if _G[CEPGP_Info.Mode..'item'..i] then
+                _G[CEPGP_Info.Mode..'itemGP'..i]:SetText("-1")
+            end
+            i = i + 1
         end
-        i = i + 1
     end
-    print("origCEPGP_populateFrame")
 end
 
 function CEPCSGP_StaticPopupImport()    
