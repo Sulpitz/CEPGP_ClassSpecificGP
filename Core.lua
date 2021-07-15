@@ -149,6 +149,10 @@ function CEPCSGP_Init()
     _G["CEPGP_distribute_raid_prio"]:SetPoint("LEFT",CEPGP_distribute_item_tex, "LEFT",  635, -34)   
     _G["CEPGP_distribute_raid_prio"]:SetText("Prio")
 
+    if _G["CEPGP_ST_History"] then
+        _G["CEPGP_ST_History"]:SetHeight(600)
+    end
+
     local CEPCSGP_EventFrame = CreateFrame("Frame")
     CEPCSGP_EventFrame:RegisterEvent('CHAT_MSG_ADDON')
     CEPCSGP_EventFrame:RegisterEvent('CHAT_MSG_WHISPER')
@@ -216,8 +220,28 @@ function CEPCSGP_addAddonMsg(message, channel, player)
 
         for i = 4, #args do
             messageEnd = messageEnd .. ";" .. args[i]
-        end  
-        
+        end
+                       
+        --if all items have same GP send to Raid
+        local lastGP = -1
+        local differentGP = false
+        for class, tbl in pairs(CEPCSGP_ITEM_TABLE[tonumber(args[2])]) do
+            local gp = tonumber(tbl["GP"])
+            if lastGP ~= gp then
+                if lastGP == -1 then
+                    lastGP = gp
+                else
+                    differentGP = true
+                    break
+                end
+            end
+        end
+        if not differentGP then            
+            message = args[1] .. ";" .. args[2] .. ";" .. lastGP .. messageEnd
+            CEPGP_print("AddonMSG RAID")
+            origCEPGP_addAddonMsg(message, channel, player)
+        end
+
         for index = 1, GetNumGroupMembers() do
             local name = GetRaidRosterInfo(index);
             if UnitIsConnected("raid" .. index) then
@@ -391,10 +415,6 @@ function CEPCSGP_StaticPopupImport()
 
                     local p = 0
                     for itemID, data in pairs(CEPCSGP_ITEM_TABLE) do
-                        print("   " .. itemID)
-                        for class, data1 in pairs(data) do
-                            print("      " .. class)
-                        end
                         p = p + 1
                     end
                     print("length CEPCSGP_ITEM_TABLE:", p)
@@ -406,33 +426,6 @@ function CEPCSGP_StaticPopupImport()
 
                     i = 1
                     local limit = #idTable
-
-                    --CEPCSGP_Timer = C_Timer.NewTicker(0.05, function()
-
-                    --    local id = idTable[i]
-                    --    local gp = GP_Table[id]
-                    --
-                    --    local link = CEPGP_getItemLink(id)
-
-                    --    if id == nil then
-                    --        CEPCSGP_Timer:Cancel()                            
-                    --        CEPGP_print("Import finished!")
-                    --    end
-                    --    
-                    --    if link ~= nil then     
-
-                    --        if CEPGP_itemExists(id) then
-                    --            CEPGP.Overrides[link] = gp
-                    --            CEPGP_print(math.floor(i/limit*100) .. "%  " ..  i .. "/" .. limit .. "  GP value for " .. link .. " |c006969FFhas been overriden to " .. gp)
-                    --        else
-                    --            print("ERROR: Item " .. id .. " does not exist")
-                    --        end
-                    --   
-                    --        i = i + 1
-                    --        CEPGP_UpdateOverrideScrollBar()
-                    --    end
-                    --end)                
-                    --CEPGP_override:Show()
                 else
                     message("Import Error")
                     print("error: " .. err)                    
