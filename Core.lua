@@ -1,7 +1,7 @@
 local origCEPGP_ListButton_OnClick = CEPGP_ListButton_OnClick
 local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
 local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
-local origCEPGP_addAddonMsg = CEPGP_addAddonMsg
+origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 local origCEPGP_populateFrame = CEPGP_populateFrame
 --CEPCSGP_ITEM_TABLE,CEPCSGP_PLAYER_CLASS_TABLE
 
@@ -222,7 +222,7 @@ function CEPCSGP_addAddonMsg(message, channel, player)
             messageEnd = messageEnd .. ";" .. args[i]
         end
                        
-        --if all items have same GP send to Raid
+        --if all items have same GP send to Raid -- DEBUG: CEPGP_DFB_LootFrame_Update(itemLink)
         local lastGP = -1
         local differentGP = false
         for class, tbl in pairs(CEPCSGP_ITEM_TABLE[tonumber(args[2])]) do
@@ -238,40 +238,67 @@ function CEPCSGP_addAddonMsg(message, channel, player)
         end
         if not differentGP then            
             message = args[1] .. ";" .. args[2] .. ";" .. lastGP .. messageEnd
-            CEPGP_print("AddonMSG RAID")
+            CEPGP_print("LootCall to: RAID")
             origCEPGP_addAddonMsg(message, channel, player)
-        end
-
-        for index = 1, GetNumGroupMembers() do
-            local name = GetRaidRosterInfo(index);
-            if UnitIsConnected("raid" .. index) then
-                local playerGP
-
-                if CEPCSGP_PLAYER_CLASS_TABLE[name] and CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]] then
-                    playerGP = CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]]['GP']
-                else 
-                    playerGP = 9999
-                end
-                --print("  ", name .. ", " .. channel .. ", " , player)
-                --print("   MSG Orig:",   message)
-                message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
-                --print("   MSG New:",   message)
-
-                origCEPGP_addAddonMsg(message, "WHISPER", name);
-
-                if name == UnitName("player") then
-                    _G["CEPGP_respond_gp_value"]:SetText(playerGP)
-                    if CEPGP_Info.Guild.Roster[name] then
-                        local gindex = CEPGP_getIndex(name);
-                        local EP, GP = CEPGP_getEPGP(name, gindex);
-                        local actualPR = math.floor((EP/GP)*100)/100
-                        local potentialPR = math.floor((EP/(GP+playerGP))*100)/100
-                        prChangeText = "PR: " .. actualPR .. " -> " .. potentialPR;
-                    end
-                    _G["CEPGP_respond_gp_change"]:SetText(prChangeText)
+        else
+            -- find most common price
+            local gpHisto = {}
+            for class, tbl in pairs(CEPCSGP_ITEM_TABLE[tonumber(args[2])]) do
+                local gpStr = tbl["GP"]
+                if not gpHisto[gpStr] then
+                    gpHisto[gpStr] = 1
+                else
+                    gpHisto[gpStr] = gpHisto[gpStr] + 1
                 end
             end
-        end        
+            local hithgestCount = 0
+            local highestGP
+            for gp, count in pairs(gpHisto) do
+                if count > hithgestCount then
+                    hithgestCount = count
+                    highestGP = gp
+                end
+            end
+
+            --send first to all to meke sure the window is opened for eeryone
+            --CEPGP_print("Send everayone: " .. highestGP)
+            message = args[1] .. ";" .. args[2] .. ";" .. highestGP .. messageEnd
+            origCEPGP_addAddonMsg(message, channel, player)
+
+            C_Timer.After(2, function()   
+                for index = 1, GetNumGroupMembers() do
+                    local name = GetRaidRosterInfo(index);
+                    if UnitIsConnected("raid" .. index) then
+                        local playerGP
+
+                        if CEPCSGP_PLAYER_CLASS_TABLE[name] and CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]] then
+                            playerGP = CEPCSGP_ITEM_TABLE[itemID][CEPCSGP_PLAYER_CLASS_TABLE[name]]['GP']
+                        else 
+                            playerGP = 9999
+                        end
+
+                        if playerGP ~= highestGP then
+                            message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
+                            --print("Send " .. name .. " " .. playerGP)
+                            origCEPGP_addAddonMsg(message, "WHISPER", name);
+                        end
+
+                        if name == UnitName("player") then
+                            _G["CEPGP_respond_gp_value"]:SetText(playerGP)
+                            if CEPGP_Info.Guild.Roster[name] then
+                                local gindex = CEPGP_getIndex(name);
+                                local EP, GP = CEPGP_getEPGP(name, gindex);
+                                local actualPR = math.floor((EP/GP)*100)/100
+                                local potentialPR = math.floor((EP/(GP+playerGP))*100)/100
+                                prChangeText = "PR: " .. actualPR .. " -> " .. potentialPR;
+                            end
+                            _G["CEPGP_respond_gp_change"]:SetText(prChangeText)
+                        end
+                    end
+                end            
+                --CEPGP_print("LootCall to: Player")                
+            end)
+        end      
         
         C_Timer.After(0.5, function()            
             _G["CEPGP_distribute_GP_value"]:Hide()
