@@ -261,7 +261,7 @@ function CEPCSGP_addAddonMsg(message, channel, player)
             end
 
             --send first to all to meke sure the window is opened for eeryone
-            --CEPGP_print("Send everayone: " .. highestGP)
+            CEPGP_print("Send everayone: " .. highestGP)
             message = args[1] .. ";" .. args[2] .. ";" .. highestGP .. messageEnd
             origCEPGP_addAddonMsg(message, channel, player)
 
@@ -279,7 +279,7 @@ function CEPCSGP_addAddonMsg(message, channel, player)
 
                         if playerGP ~= highestGP then
                             message = args[1] .. ";" .. args[2] .. ";" .. playerGP .. messageEnd
-                            --print("Send " .. name .. " " .. playerGP)
+                            print("Send " .. name .. " " .. playerGP)
                             origCEPGP_addAddonMsg(message, "WHISPER", name);
                         end
 
@@ -296,7 +296,7 @@ function CEPCSGP_addAddonMsg(message, channel, player)
                         end
                     end
                 end            
-                --CEPGP_print("LootCall to: Player")                
+                -- CEPGP_print("LootCall to: Player")                
             end)
         end      
         
@@ -429,7 +429,7 @@ function CEPCSGP_StaticPopupImport()
 
                 local editbox = _G[this:GetParent():GetName() .. "WideEditBox"] or _G[this:GetName() .. "EditBox"]
 
-                local importstring = "CEPCSGP_ITEM_TABLE = {" .. editbox:GetText() .. "}"
+                local importstring = "CEPCSGP_IMPORT_STRING = {" .. editbox:GetText() .. "}"
 
                 local _, err = loadstring(importstring)
 
@@ -441,17 +441,21 @@ function CEPCSGP_StaticPopupImport()
                     local i = 0         
 
                     local p = 0
-                    for itemID, data in pairs(CEPCSGP_ITEM_TABLE) do
+                    for itemID, data in pairs(CEPCSGP_IMPORT_STRING) do
                         p = p + 1
+                        CEPCSGP_ITEM_TABLE[itemID] = data
                     end
-                    print("length CEPCSGP_ITEM_TABLE:", p)
+                    print("Neu:", p)
 
+                    i = 0
                     for id, _ in pairs (CEPCSGP_ITEM_TABLE) do
                         i = i + 1
                         idTable[i] = id
                     end
+                    
+                    print("Gesamt:", i)
 
-                    i = 1
+                    
                     local limit = #idTable
                 else
                     message("Import Error")
