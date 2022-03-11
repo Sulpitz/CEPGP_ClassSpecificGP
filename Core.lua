@@ -3,7 +3,7 @@ local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
 local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
 origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 local origCEPGP_populateFrame = CEPGP_populateFrame
-local origCEPGP_rosterUpdate = CEPGP_CEPGP_rosterUpdate
+local origCEPGP_rosterUpdate = CEPGP_rosterUpdate
 --CEPCSGP_ITEM_TABLE,CEPCSGP_PLAYER_CLASS_TABLE
 
 --/run CEPGP_distribute_popup:Show()
@@ -134,7 +134,20 @@ local function refreshDropdown(player, itemID)
     end)
 end
 
-
+local function init_auto_alt_links()
+    CEPGP.Alt.Auto = false
+    CEPGP_options_alt_mangement_auto_generate:Hide()
+    CEPGP_options_alt_mangement_main_link:Hide();
+    CEPGP_options_alt_mangement_alt_link:Hide();
+    CEPGP_options_alt_mangement_add_link:Hide();
+    CEPGP_options_alt_mangement_remove_link:Hide();
+    CEPGP_options_alt_mangement_remove_main:Hide();
+    CEPGP_options_alt_mangement_clear_fields:Hide();
+    CEPGP_options_alt_mangement_new_main:Hide();
+    CEPGP_options_alt_mangement_new_alt:Hide();
+    CEPGP_options_alt_mangement_new_link:Hide();
+    CEPGP_options_alt_mangement_auto_generate_text:SetText("Automatically Generate Alt Links From User Note Active")
+end
 
 function CEPCSGP_Init()
     print("CEPCSGP INIT")
@@ -165,6 +178,7 @@ function CEPCSGP_Init()
         CEPCSGP_PLAYER_CLASS_TABLE = {}
     end
     createDropdown()
+    init_auto_alt_links()
 end
 
 function CEPCSGP_EventHandler(self, event, ...)
@@ -475,23 +489,36 @@ function CEPCSGP_StaticPopupImport()
     StaticPopup_Show("CEPCSGP_IMPORT", export_text)
 end
 
+
 --hook for alternative alt_name Management
 function CEPGP_rosterUpdate(event)
     origCEPGP_rosterUpdate(event)
-    
-    if CEPGP.Alt.Auto then
-        CEPGP.Alt.Links = {};
-		for k, v in pairs(CEPGP_Info.Guild.Roster) do
-            local note = CEPGP_Info.Guild.Roster[v[11]]
-			if note then                
-                local main_name = string.match(note, "%[.+%]")
-                if main_name then
-                    main_name = string.sub(main_name, 2, -2)
-				    CEPGP_addCharacterLink(main_name, k, true);
+
+    local guildRoster = {}
+    for i = 1, GetNumGuildMembers() do
+        name = GetGuildRosterInfo(i)
+        guildRoster[Ambiguate(name, "all")] = true
+    end
+
+    CEPGP.Alt.Links = {};
+
+    for k, v in pairs(CEPGP_Info.Guild.Roster) do
+        local note = v[11]
+
+        if note then
+            local main_name = string.match(note, "%[.+%]")    
+                    
+            if main_name then
+                main_name = string.sub(main_name, 2, -2)
+
+                if guildRoster[main_name] then
+                    CEPGP_addCharacterLink(main_name, k, true);
+                else
+                    CEPGP_print("Alt link failed for " .. k .. ". '" .. main_name .. "' not in Guild")
                 end
-			end
-		end
-	end    
+            end
+        end
+    end
 end
 
 CEPCSGP_Init()
