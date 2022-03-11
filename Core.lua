@@ -3,6 +3,7 @@ local origCEPGP_sendChatMessage = CEPGP_sendChatMessage
 local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
 origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 local origCEPGP_populateFrame = CEPGP_populateFrame
+local origCEPGP_rosterUpdate = CEPGP_CEPGP_rosterUpdate
 --CEPCSGP_ITEM_TABLE,CEPCSGP_PLAYER_CLASS_TABLE
 
 --/run CEPGP_distribute_popup:Show()
@@ -472,6 +473,25 @@ function CEPCSGP_StaticPopupImport()
         }
         
     StaticPopup_Show("CEPCSGP_IMPORT", export_text)
+end
+
+--hook for alternative alt_name Management
+function CEPGP_rosterUpdate(event)
+    origCEPGP_rosterUpdate(event)
+    
+    if CEPGP.Alt.Auto then
+        CEPGP.Alt.Links = {};
+		for k, v in pairs(CEPGP_Info.Guild.Roster) do
+            local note = CEPGP_Info.Guild.Roster[v[11]]
+			if note then                
+                local main_name = string.match(note, "%[.+%]")
+                if main_name then
+                    main_name = string.sub(main_name, 2, -2)
+				    CEPGP_addCharacterLink(main_name, k, true);
+                end
+			end
+		end
+	end    
 end
 
 CEPCSGP_Init()
