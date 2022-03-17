@@ -4,6 +4,7 @@ local origCEPGP_UpdateLootScrollBar = CEPGP_UpdateLootScrollBar
 origCEPGP_addAddonMsg = CEPGP_addAddonMsg
 local origCEPGP_populateFrame = CEPGP_populateFrame
 local origCEPGP_rosterUpdate = CEPGP_rosterUpdate
+local origCEPGP_print = CEPGP_print
 --CEPCSGP_ITEM_TABLE,CEPCSGP_PLAYER_CLASS_TABLE
 
 --/run CEPGP_distribute_popup:Show()
@@ -519,6 +520,14 @@ function CEPGP_rosterUpdate(event)
             end
         end
     end
+end
+
+function CEPGP_print(str, err)
+    if string.sub(str, -26) == "added to the standby list." then
+        SendChatMessage(str ,"OFFICER" ,"language");
+    end
+
+    origCEPGP_print(str, err)
 end
 
 CEPCSGP_Init()
