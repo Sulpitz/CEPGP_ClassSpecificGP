@@ -523,8 +523,10 @@ function CEPGP_rosterUpdate(event)
 end
 
 function CEPGP_print(str, err)
-    if string.sub(str, -26) == "added to the standby list." then
-        SendChatMessage(str ,"OFFICER" ,"language");
+    if CEPGP_isML() then
+        if string.sub(str, -26) == "added to the standby list." then
+            SendChatMessage(str ,"OFFICER" ,"language");
+        end
     end
 
     origCEPGP_print(str, err)
